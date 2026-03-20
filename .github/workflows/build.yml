@@ -1,16 +1,11 @@
-name: "FAP: Build for multiple SDK sources"
-# This will build your app for dev and release channels on GitHub. 
-# It will also build your app every day to make sure it's up to date with the latest SDK changes.
-# See https://github.com/marketplace/actions/build-flipper-application-package-fap for more information
+name: Build
 
 on:
   push:
-    ## put your main branch name under "branches"
-    #branches: 
-    #  - master 
+    branches:
+      - master
   pull_request:
-  schedule: 
-    # do a build every day
+  schedule:
     - cron: "1 1 * * *"
 
 jobs:
@@ -23,19 +18,64 @@ jobs:
             sdk-channel: dev
           - name: release channel
             sdk-channel: release
-          # You can add unofficial channels here. See ufbt action docs for more info.
-    name: 'ufbt: Build for ${{ matrix.name }}'
+    name: "Build for ${{ matrix.name }}"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Build with ufbt
         uses: flipperdevices/flipperzero-ufbt-action@v0.1
         id: build-app
         with:
           sdk-channel: ${{ matrix.sdk-channel }}
+
       - name: Upload app artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          # See ufbt action docs for other output variables
           name: ${{ github.event.repository.name }}-${{ steps.build-app.outputs.suffix }}
           path: ${{ steps.build-app.outputs.fap-artifacts }}
+
+  lint:
+    runs-on: ubuntu-latest
+    name: Lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint with ufbt
+        uses: flipperdevices/flipperzero-ufbt-action@v0.1
+        with:
+          task: lint
+
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: [ufbt-build, lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    name: Release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build release FAP
+        uses: flipperdevices/flipperzero-ufbt-action@v0.1
+        id: build-release
+        with:
+          sdk-channel: release
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(grep 'fap_version=' application.fam | sed 's/.*"\(.*\)".*/\1/')
+          SHA_SHORT=$(git rev-parse --short HEAD)
+          echo "tag=v${VERSION}-${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+          echo "name=OpenShock Flipper Zero v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.name }}
+          files: ${{ steps.build-release.outputs.fap-artifacts }}/*
+          generate_release_notes: true
