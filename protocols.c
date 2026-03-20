@@ -1,6 +1,261 @@
 #include "protocols.h"
 
-// --- Helpers ---
+// --- Encode helpers (forward declarations) ---
+
+static uint8_t checksum_sum8_u32(uint32_t data);
+static uint8_t reverse_inverse_nibble(uint8_t b);
+
+// --- Decode helpers ---
+
+static bool timing_match(uint16_t actual, uint16_t expected) {
+    int32_t diff = (int32_t)actual - (int32_t)expected;
+    int32_t tol = (int32_t)expected * 3 / 10; // +/- 30%
+    return diff >= -tol && diff <= tol;
+}
+
+static bool pulse_match(const OokPulse* p, const OokPulse* expected) {
+    return timing_match(p->high_us, expected->high_us) &&
+           timing_match(p->low_us, expected->low_us);
+}
+
+// Decode bits from pulses using timing-based OOK. Returns false if any bit doesn't match.
+static bool
+    decode_bits(const OokPulse* pulses, size_t num_bits, uint64_t* out, OokPulse one, OokPulse zero) {
+    uint64_t data = 0;
+    for(size_t i = 0; i < num_bits; i++) {
+        data <<= 1;
+        if(timing_match(pulses[i].high_us, one.high_us) &&
+           timing_match(pulses[i].low_us, one.low_us)) {
+            data |= 1;
+        } else if(
+            timing_match(pulses[i].high_us, zero.high_us) &&
+            timing_match(pulses[i].low_us, zero.low_us)) {
+            // bit 0, already 0
+        } else {
+            return false;
+        }
+    }
+    *out = data;
+    return true;
+}
+
+// --- Decoders ---
+
+static bool decode_caixianlin(const OokPulse* pulses, size_t count, DecodedShocker* r) {
+    if(count < 44) return false;
+    static const OokPulse preamble = {1400, 750};
+    static const OokPulse bit1 = {750, 250};
+    static const OokPulse bit0 = {250, 750};
+    if(!pulse_match(&pulses[0], &preamble)) return false;
+
+    uint64_t data;
+    if(!decode_bits(pulses + 1, 43, &data, bit1, bit0)) return false;
+
+    // Remove 3 trailing zero bits
+    data >>= 3;
+    uint8_t checksum = data & 0xFF;
+    uint32_t payload = (data >> 8) & 0xFFFFFFFF;
+    if(checksum_sum8_u32(payload) != checksum) return false;
+
+    r->model = ShockerModelCaiXianlin;
+    r->shocker_id = (payload >> 16) & 0xFFFF;
+    r->channel = (payload >> 12) & 0xF;
+    r->intensity = payload & 0xFF;
+    switch((payload >> 8) & 0xF) {
+    case 0x01:
+        r->command = ShockerCmdShock;
+        break;
+    case 0x02:
+        r->command = ShockerCmdVibrate;
+        break;
+    case 0x03:
+        r->command = ShockerCmdSound;
+        break;
+    case 0x04:
+        r->command = ShockerCmdLight;
+        break;
+    default:
+        return false;
+    }
+    return true;
+}
+
+static bool decode_petrainer(const OokPulse* pulses, size_t count, DecodedShocker* r) {
+    if(count < 42) return false;
+    static const OokPulse preamble = {750, 750};
+    static const OokPulse bit1 = {200, 1500};
+    static const OokPulse bit0 = {200, 750};
+    if(!pulse_match(&pulses[0], &preamble)) return false;
+
+    uint64_t data;
+    if(!decode_bits(pulses + 1, 40, &data, bit1, bit0)) return false;
+
+    uint8_t type_val = (data >> 32) & 0xFF;
+    uint8_t type_sum = data & 0xFF;
+
+    uint8_t n_shift;
+    switch(type_val) {
+    case 0x81:
+        n_shift = 0;
+        break;
+    case 0x82:
+        n_shift = 1;
+        break;
+    case 0x84:
+        n_shift = 2;
+        break;
+    default:
+        return false;
+    }
+    if(type_sum != ((~(0x01 | (0x80 >> n_shift))) & 0xFF)) return false;
+
+    r->model = ShockerModelPetrainer;
+    r->shocker_id = (data >> 16) & 0xFFFF;
+    r->channel = 0;
+    r->intensity = (data >> 8) & 0xFF;
+    switch(n_shift) {
+    case 0:
+        r->command = ShockerCmdShock;
+        break;
+    case 1:
+        r->command = ShockerCmdVibrate;
+        break;
+    case 2:
+        r->command = ShockerCmdSound;
+        break;
+    default:
+        return false;
+    }
+    return true;
+}
+
+static bool decode_petrainer998dr(const OokPulse* pulses, size_t count, DecodedShocker* r) {
+    if(count < 42) return false;
+    static const OokPulse preamble = {1500, 750};
+    static const OokPulse bit1 = {750, 250};
+    static const OokPulse bit0 = {250, 750};
+    if(!pulse_match(&pulses[0], &preamble)) return false;
+
+    uint64_t data;
+    if(!decode_bits(pulses + 1, 40, &data, bit1, bit0)) return false;
+
+    uint8_t channel = (data >> 36) & 0xF;
+    uint8_t type_val = (data >> 32) & 0xF;
+    uint8_t type_invert = (data >> 4) & 0xF;
+    uint8_t channel_invert = data & 0xF;
+    if(type_invert != reverse_inverse_nibble(type_val)) return false;
+    if(channel_invert != reverse_inverse_nibble(channel)) return false;
+
+    r->model = ShockerModelPetrainer998DR;
+    r->shocker_id = (data >> 16) & 0xFFFF;
+    r->channel = (channel == 0x08) ? 0 : 1;
+    r->intensity = (data >> 8) & 0xFF;
+    switch(type_val) {
+    case 0x01:
+        r->command = ShockerCmdShock;
+        break;
+    case 0x02:
+        r->command = ShockerCmdVibrate;
+        break;
+    case 0x04:
+        r->command = ShockerCmdSound;
+        break;
+    case 0x08:
+        r->command = ShockerCmdLight;
+        break;
+    default:
+        return false;
+    }
+    return true;
+}
+
+static bool decode_t330(const OokPulse* pulses, size_t count, DecodedShocker* r) {
+    if(count < 43) return false;
+    static const OokPulse preamble = {960, 790};
+    static const OokPulse bit1 = {220, 980};
+    static const OokPulse bit0 = {220, 580};
+    if(!pulse_match(&pulses[0], &preamble)) return false;
+
+    uint64_t data;
+    if(!decode_bits(pulses + 1, 41, &data, bit1, bit0)) return false;
+
+    data >>= 1; // trailing zero
+    uint8_t ch1 = (data >> 36) & 0xF;
+    uint8_t ch2 = data & 0xF;
+    if(ch1 != ch2) return false;
+
+    uint8_t type_val = (((data >> 32) & 0xF) << 4) | ((data >> 4) & 0xF);
+
+    r->model = ShockerModelT330;
+    r->shocker_id = (data >> 16) & 0xFFFF;
+    r->channel = (ch1 == 0x00) ? 0 : 1;
+    r->intensity = (data >> 8) & 0xFF;
+    switch(type_val) {
+    case 0x61:
+        r->command = ShockerCmdShock;
+        break;
+    case 0x72:
+        r->command = ShockerCmdVibrate;
+        break;
+    case 0x84:
+        r->command = ShockerCmdSound;
+        break;
+    default:
+        return false;
+    }
+    return true;
+}
+
+static bool decode_d80(const OokPulse* pulses, size_t count, DecodedShocker* r) {
+    if(count < 42) return false;
+    static const OokPulse preamble = {1900, 4000};
+    static const OokPulse bit1 = {900, 300};
+    static const OokPulse bit0 = {300, 900};
+    if(!pulse_match(&pulses[0], &preamble)) return false;
+
+    uint64_t data;
+    if(!decode_bits(pulses + 1, 40, &data, bit1, bit0)) return false;
+
+    if(((data >> 32) & 0xFF) != 0x04) return false;
+
+    uint32_t payload = (data >> 8) & 0xFFFFFFFF;
+    uint8_t checksum = data & 0xFF;
+    if(checksum_sum8_u32(payload) != checksum) return false;
+
+    r->model = ShockerModelD80;
+    r->shocker_id = (payload >> 8) & 0xFFFF;
+    r->channel = (payload >> 4) & 0x3;
+    uint8_t raw_intensity = payload & 0xF;
+    r->intensity = (raw_intensity * 100) / 15; // scale 0-15 back to 0-100
+    switch((payload >> 6) & 0x3) {
+    case 0x01:
+        r->command = ShockerCmdShock;
+        break;
+    case 0x02:
+        r->command = ShockerCmdVibrate;
+        break;
+    case 0x03:
+        r->command = ShockerCmdSound;
+        break;
+    default:
+        return false;
+    }
+    return true;
+}
+
+bool openshock_decode(const OokPulse* pulses, size_t count, DecodedShocker* result) {
+    for(size_t i = 0; i < count; i++) {
+        size_t remaining = count - i;
+        if(remaining >= 44 && decode_caixianlin(pulses + i, remaining, result)) return true;
+        if(remaining >= 42 && decode_petrainer(pulses + i, remaining, result)) return true;
+        if(remaining >= 42 && decode_petrainer998dr(pulses + i, remaining, result)) return true;
+        if(remaining >= 43 && decode_t330(pulses + i, remaining, result)) return true;
+        if(remaining >= 42 && decode_d80(pulses + i, remaining, result)) return true;
+    }
+    return false;
+}
+
+// --- Encode helpers ---
 
 static uint8_t checksum_sum8_u32(uint32_t data) {
     uint8_t sum = 0;

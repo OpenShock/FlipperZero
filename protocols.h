@@ -30,6 +30,15 @@ typedef struct {
 // Maximum pulse buffer size across all protocols (CaiXianlin is largest at 44)
 #define OPENSHOCK_MAX_PULSES 48
 
+// Decoded shocker command (result of RX decoding).
+typedef struct {
+    ShockerModel model;
+    uint16_t shocker_id;
+    uint8_t channel;
+    ShockerCommand command;
+    uint8_t intensity;
+} DecodedShocker;
+
 // Returns the display name for a shocker model.
 const char* openshock_model_name(ShockerModel model);
 
@@ -38,6 +47,10 @@ const char* openshock_command_name(ShockerCommand command);
 
 // Returns whether a command is supported by the given model.
 bool openshock_command_supported(ShockerModel model, ShockerCommand command);
+
+// Try to decode OOK pulses into a shocker command.
+// Tries all protocols with a sliding window. Returns true on first match.
+bool openshock_decode(const OokPulse* pulses, size_t count, DecodedShocker* result);
 
 // Encode a command into OOK pulse timings.
 // Returns number of pulses written, or 0 on error.
