@@ -4,7 +4,13 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - "*.md"
+      - "screenshots/**"
   pull_request:
+    paths-ignore:
+      - "*.md"
+      - "screenshots/**"
   schedule:
     - cron: "1 1 * * *"
 

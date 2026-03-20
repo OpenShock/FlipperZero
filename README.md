@@ -2,6 +2,18 @@
 
 A [Flipper Zero](https://flipperzero.one/) application for controlling [OpenShock](https://openshock.org/) compatible shockers over 433 MHz.
 
+![App tour](screenshots/tour.gif)
+
+## Features
+
+- **Transmit** — send commands to any supported shocker by configuring model, ID, channel, command type, and intensity. Hold OK to transmit continuously.
+- **Receive** — listen for 433 MHz OOK transmissions and automatically decode shocker commands from any supported protocol.
+- **Save/Load** — save shocker configurations to the SD card for quick access. Save directly from the receive screen after capturing a transmission.
+
+| Main Menu | Transmit | Edit | Receive |
+|:---------:|:--------:|:----:|:-------:|
+| ![Main menu](screenshots/list.png) | ![Transmit](screenshots/transmit.png) | ![Edit](screenshots/edit.png) | ![Receive](screenshots/receive.png) |
+
 ## Supported Shockers
 
 | Model | Commands |
@@ -11,12 +23,6 @@ A [Flipper Zero](https://flipperzero.one/) application for controlling [OpenShoc
 | Petrainer 998DR | Shock, Vibrate, Sound, Light |
 | Wellturnt T330 | Shock, Vibrate, Sound |
 | D80 | Shock, Vibrate, Sound |
-
-## Features
-
-- **Transmit** — send commands to any supported shocker by configuring model, ID, channel, command type, and intensity. Hold OK to transmit continuously.
-- **Receive** — listen for 433 MHz OOK transmissions and automatically decode shocker commands from any supported protocol.
-- **Save/Load** — save shocker configurations to the SD card for quick access. Save directly from the receive screen after capturing a transmission.
 
 ## Installation
 
