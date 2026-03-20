@@ -120,8 +120,7 @@ static void draw_menu(Canvas* canvas, AppState* s) {
     canvas_set_font(canvas, FontSecondary);
     for(int i = 0; i < MenuCount; i++) {
         int y = 24 + i * 12;
-        if(i == (int)s->menu_sel)
-            canvas_draw_str(canvas, 4, y, ">");
+        if(i == (int)s->menu_sel) canvas_draw_str(canvas, 4, y, ">");
         canvas_draw_str(canvas, 14, y, menu_label((MenuItem)i));
     }
 }
@@ -151,8 +150,7 @@ static void draw_edit(Canvas* canvas, AppState* s) {
 
     // Scroll window to keep selection visible
     int scroll = 0;
-    if((int)s->selected_field >= max_visible)
-        scroll = (int)s->selected_field - max_visible + 1;
+    if((int)s->selected_field >= max_visible) scroll = (int)s->selected_field - max_visible + 1;
 
     const char* labels[] = {"Model:", "ID:", "Ch:", "Cmd:", "Int:"};
     for(int vi = 0; vi < max_visible; vi++) {
@@ -188,7 +186,8 @@ static void draw_edit(Canvas* canvas, AppState* s) {
 
     // Scroll indicators
     if(scroll > 0) canvas_draw_str(canvas, 122, content_y, "^");
-    if(scroll + max_visible < FieldCount) canvas_draw_str(canvas, 122, content_y + (max_visible - 1) * rh, "v");
+    if(scroll + max_visible < FieldCount)
+        canvas_draw_str(canvas, 122, content_y + (max_visible - 1) * rh, "v");
 
     canvas_draw_str(canvas, 0, 64, "Hold OK:TX  Long OK:Save");
 }
@@ -244,7 +243,8 @@ static void draw_receive(Canvas* canvas, AppState* s) {
         snprintf(buf, sizeof(buf), "Model: %s", openshock_model_name(s->rx_result.model));
         canvas_draw_str(canvas, 4, y, buf);
         y += 10;
-        snprintf(buf, sizeof(buf), "ID: %u  CH: %u", s->rx_result.shocker_id, s->rx_result.channel);
+        snprintf(
+            buf, sizeof(buf), "ID: %u  CH: %u", s->rx_result.shocker_id, s->rx_result.channel);
         canvas_draw_str(canvas, 4, y, buf);
         y += 10;
         snprintf(
@@ -366,9 +366,8 @@ static void handle_edit_field(AppState* s, InputKey key, InputType type) {
     case FieldID: {
         uint16_t step = id_step(type);
         if(key == InputKeyLeft)
-            s->shocker_id =
-                (s->shocker_id >= step) ? (s->shocker_id - step) :
-                                          (uint16_t)(65536 - step + s->shocker_id);
+            s->shocker_id = (s->shocker_id >= step) ? (s->shocker_id - step) :
+                                                      (uint16_t)(65536 - step + s->shocker_id);
         else {
             uint32_t n = (uint32_t)s->shocker_id + step;
             s->shocker_id = (n <= 65535) ? (uint16_t)n : (uint16_t)(n - 65536);
@@ -392,9 +391,8 @@ static void handle_edit_field(AppState* s, InputKey key, InputType type) {
     case FieldIntensity: {
         uint8_t step = intensity_step(type);
         if(key == InputKeyLeft)
-            s->intensity =
-                (s->intensity >= step) ? (s->intensity - step) :
-                                         (uint8_t)(101 - step + s->intensity);
+            s->intensity = (s->intensity >= step) ? (s->intensity - step) :
+                                                    (uint8_t)(101 - step + s->intensity);
         else {
             uint16_t n = (uint16_t)s->intensity + step;
             s->intensity = (n <= 100) ? (uint8_t)n : (uint8_t)(n - 101);
@@ -406,15 +404,19 @@ static void handle_edit_field(AppState* s, InputKey key, InputType type) {
     }
 }
 
-static void
-    handle_edit(AppState* s, InputEvent* e, OpenshockTx* tx, OpenshockTx** tx_active) {
+static void handle_edit(AppState* s, InputEvent* e, OpenshockTx* tx, OpenshockTx** tx_active) {
     // OK press: start TX
     if(e->key == InputKeyOk && e->type == InputTypePress) {
         s->transmitting = true;
 
         OokPulse pulses[OPENSHOCK_MAX_PULSES];
         size_t count = openshock_encode(
-            s->model, s->shocker_id, s->command, s->intensity, s->channel, pulses,
+            s->model,
+            s->shocker_id,
+            s->command,
+            s->intensity,
+            s->channel,
+            pulses,
             OPENSHOCK_MAX_PULSES);
         if(count > 0) {
             openshock_tx_start(tx, pulses, count);

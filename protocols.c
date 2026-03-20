@@ -19,8 +19,12 @@ static bool pulse_match(const OokPulse* p, const OokPulse* expected) {
 }
 
 // Decode bits from pulses using timing-based OOK. Returns false if any bit doesn't match.
-static bool
-    decode_bits(const OokPulse* pulses, size_t num_bits, uint64_t* out, OokPulse one, OokPulse zero) {
+static bool decode_bits(
+    const OokPulse* pulses,
+    size_t num_bits,
+    uint64_t* out,
+    OokPulse one,
+    OokPulse zero) {
     uint64_t data = 0;
     for(size_t i = 0; i < num_bits; i++) {
         data <<= 1;
@@ -331,8 +335,7 @@ static size_t encode_caixianlin(
 // Protocol: preamble + 40 data bits + postamble
 // Supports: Shock, Vibrate, Sound
 
-static size_t
-    encode_petrainer(uint16_t id, ShockerCommand cmd, uint8_t intensity, OokPulse* buf) {
+static size_t encode_petrainer(uint16_t id, ShockerCommand cmd, uint8_t intensity, OokPulse* buf) {
     static const OokPulse preamble = {750, 750};
     static const OokPulse bit1 = {200, 1500};
     static const OokPulse bit0 = {200, 750};
@@ -423,12 +426,8 @@ static size_t encode_petrainer998dr(
 // Protocol: preamble + 41 data bits + postamble
 // Supports: Shock, Vibrate, Sound
 
-static size_t encode_t330(
-    uint16_t id,
-    ShockerCommand cmd,
-    uint8_t intensity,
-    uint8_t channel,
-    OokPulse* buf) {
+static size_t
+    encode_t330(uint16_t id, ShockerCommand cmd, uint8_t intensity, uint8_t channel, OokPulse* buf) {
     static const OokPulse preamble = {960, 790};
     static const OokPulse bit1 = {220, 980};
     static const OokPulse bit0 = {220, 580};
