@@ -650,7 +650,7 @@ static void transmit_draw_vertical_in_bar(
     const char* text,
     bool is_light_label) {
     if(text == NULL || text[0] == '\0') return;
-    canvas_set_font(canvas, FontBatteryPercent);
+    canvas_set_font(canvas, FontKeyboard);
     canvas_set_font_direction(canvas, CanvasDirectionBottomToTop);
     canvas_set_color(canvas, ColorXOR);
     int cy = bar_y + bar_h / 2 + 4;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <furi.h>
+#include <storage/storage.h>
 #include "protocols.h"
 #include <stdbool.h>
 
