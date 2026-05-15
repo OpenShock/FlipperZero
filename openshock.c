@@ -882,9 +882,9 @@ static void draw_transmit_horizontal(Canvas* canvas, AppState* s) {
 
     if(c->command == ShockerCmdLight) {
         if(!flash_active(s)) {
-            canvas_set_font(canvas, FontPrimary);
+            canvas_set_font(canvas, FontSecondary);
             const char* light_state = (c->intensity == 0) ? "ON" : "OFF";
-            canvas_draw_str_aligned(canvas, 64, 42, AlignCenter, AlignCenter, light_state);
+            canvas_draw_str_aligned(canvas, 64, 38, AlignCenter, AlignCenter, light_state);
         }
     } else if(!flash_active(s)) {
         canvas_set_font(canvas, FontSecondary);
@@ -901,6 +901,7 @@ static void draw_transmit_horizontal(Canvas* canvas, AppState* s) {
         if(fill > 0) canvas_draw_box(canvas, bar_x + 1, bar_y + 1, fill, bar_h - 2);
     }
 
+    canvas_set_font(canvas, FontSecondary);
     elements_button_left(canvas, "Mode");
     elements_button_center(canvas, "TX");
     elements_button_right(canvas, "Mode");
@@ -1492,17 +1493,6 @@ static bool handle_transmit_horizontal(OpenshockCtx* app, InputEvent* e) {
         if(c->command == ShockerCmdLight) {
             if(transmit_sync_popup_active(s)) return true;
             c->intensity = 0;
-            if(*active) {
-                openshock_tx_stop(tx);
-                *active = NULL;
-            }
-            OokPulse pulses_on[OPENSHOCK_MAX_PULSES];
-            size_t cnt_on = 0;
-            if(tx_fill_pulses(s, pulses_on, &cnt_on) && cnt_on > 0) {
-                openshock_tx_start(tx, pulses_on, cnt_on);
-                *active = tx;
-                s->transmitting = true;
-            }
         } else if(c->intensity < 100) {
             uint8_t step = (e->type == InputTypeRepeat) ? 5 : 1;
             uint16_t n = (uint16_t)c->intensity + step;
@@ -1513,17 +1503,6 @@ static bool handle_transmit_horizontal(OpenshockCtx* app, InputEvent* e) {
         if(c->command == ShockerCmdLight) {
             if(transmit_sync_popup_active(s)) return true;
             c->intensity = 100;
-            if(*active) {
-                openshock_tx_stop(tx);
-                *active = NULL;
-            }
-            OokPulse pulses_off[OPENSHOCK_MAX_PULSES];
-            size_t cnt_off = 0;
-            if(tx_fill_pulses(s, pulses_off, &cnt_off) && cnt_off > 0) {
-                openshock_tx_start(tx, pulses_off, cnt_off);
-                *active = tx;
-                s->transmitting = true;
-            }
         } else if(c->intensity > 0) {
             uint8_t step = (e->type == InputTypeRepeat) ? 5 : 1;
             c->intensity = (c->intensity >= step) ? (c->intensity - step) : 0;
