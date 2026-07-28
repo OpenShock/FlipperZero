@@ -55,6 +55,6 @@ jobs:
           PRERELEASE: ${{ steps.meta.outputs.prerelease }}
           FAP_ARTIFACTS: ${{ steps.build-release.outputs.fap-artifacts }}
         run: |
-          ARGS=("$TAG" release.json "$FAP_ARTIFACTS"/* --title "$TAG" --notes-file release-notes.md)
+          ARGS=("$TAG" release.json "$FAP_ARTIFACTS" --title "$TAG" --notes-file release-notes.md)
           [ "$PRERELEASE" = "true" ] && ARGS+=(--prerelease)
           gh release create "${ARGS[@]}"
